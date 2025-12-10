@@ -40,7 +40,7 @@ private slots:
 
     void clearAllMarks();
 
-     void setProtractorMode(bool enabled);
+    void setProtractorMode(bool enabled);
 
 
 
