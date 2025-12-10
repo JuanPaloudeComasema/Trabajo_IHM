@@ -1,4 +1,3 @@
-
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 
@@ -128,7 +127,7 @@ MainWindow::MainWindow(QWidget *parent)
     scene->addItem(m_protractor);
 
     // Tamaño "lógico" aproximado, como antes
-    m_protractor->setToolSize(QSizeF(580, 380));
+    m_protractor->setToolSize(QSizeF(1280, 1080));
 
     // Z alta para que quede en overlay
     m_protractor->setZValue(1000);
@@ -522,7 +521,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
                     // 2. Medir ángulo respecto al centro real del transportador
                     QPointF centerLocal = m_protractor->boundingRect().center();
                     QPointF centerScene = m_protractor->sceneTransform().map(centerLocal);
-                        // centro mapeado a escena
+                          // centro mapeado a escena
 
                     // Vector desde el centro al clic
                     QPointF d = scenePos - centerScene;
