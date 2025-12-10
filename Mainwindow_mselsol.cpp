@@ -1,7 +1,3 @@
-// fichero mainwindow.cpp con la implementación de los puntos 6.Añadir Texto(elegir color y tamaño) y 7.Borrar marcas sobre el lienzo
-// Falta darle diseño desde el mainwindow.ui, esto implementa las funciones en el tool bar
-
-
 
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
@@ -17,6 +13,7 @@
 #include <QLineEdit>         // <<-- QLineEdit::Normal
 #include <QGraphicsTextItem> // <<-- para dibujar texto
 #include <QDebug>            // <<-- para prints de debug
+#include <QMessageBox>
 
 
 
@@ -110,6 +107,22 @@ MainWindow::MainWindow(QWidget *parent)
     m_actErase->setCheckable(true);
     connect(m_actErase, &QAction::toggled, this, &MainWindow::setEraseMode);
 
+
+    // =====================================================
+    // === Acción LIMPIAR la carta (tarea 8)
+    // =====================================================
+    m_actClear = ui->toolBar->addAction("Limpiar");
+
+    connect(m_actClear, &QAction::triggered, this, &MainWindow::clearAllMarks);
+
+    // =====================================================
+    // === Acción TRANSPORTADOR (tarea 9)
+    // =====================================================
+    m_actProtractor = ui->toolBar->addAction("Transportador");
+    m_actProtractor->setCheckable(true);
+    connect(m_actProtractor, &QAction::toggled, this, &MainWindow::setProtractorMode);
+
+
     //  Regla dentro de la escena
     m_protractor = new Tool(":/resources/icons/transportador.svg");
     scene->addItem(m_protractor);
@@ -122,7 +135,8 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Posición inicial en la esquina superior izquierda de la vista
     m_protractor->setPos(view->mapToScene(20, 20));
-    m_protractor->setPos(QPoint(20, 20));
+    m_protractor->setVisible(false);  // no visible al inicio
+
 }
 
 void MainWindow::zoomIn()
@@ -188,7 +202,7 @@ void MainWindow::setDrawLineMode(bool enabled)
 }
 
 // ==============================================================
-// ======= NUEVO: Acción para añadir texto  6 =======
+// ======= NUEVO: Acción para añadir texto  6 ==================
 // ==============================================================
 
 
@@ -232,7 +246,7 @@ void MainWindow::setTextMode(bool enabled)
 }
 
 // ==============================================================
-// ======= NUEVO: Acción para borrar marcas 7 =======
+// ======= NUEVO: 7. Acción para borrar marcas =================
 // ==============================================================
 
 void MainWindow::setEraseMode(bool enabled)
@@ -266,13 +280,97 @@ void MainWindow::setEraseMode(bool enabled)
         statusBar()->clearMessage();
     }
 }
+
+// ==============================================================
+// ======= NUEVO: 8. Acción para resetear y limpiar la carta ===
+// ==============================================================
+
+void MainWindow::clearAllMarks()
+{
+    // Confirmación
+    QMessageBox::StandardButton reply;
+    reply = QMessageBox::question(
+        this,
+        "Limpiar carta",
+        "¿Seguro que quieres borrar todas las marcas?",
+        QMessageBox::Yes | QMessageBox::No
+        );
+
+    if (reply != QMessageBox::Yes)
+        return;
+
+    // Recorremos los items de la escena
+    QList<QGraphicsItem*> all = scene->items();
+
+    for (QGraphicsItem *item : all) {
+
+        // No borrar la carta (z = 0)
+        if (item->zValue() <= 0)
+            continue;
+
+        // No borrar el transportador
+        if (item == m_protractor)
+            continue;
+
+        // Borrar la marca
+        scene->removeItem(item);
+        delete item;
+    }
+}
+
+void MainWindow::setProtractorMode(bool enabled)
+{
+    m_protractorMode = enabled;
+
+    if (enabled)
+    {
+        // Mostrar transportador
+        m_protractor->setVisible(true);
+
+        // Desactivar otros modos
+        if (m_actDrawLine && m_actDrawLine->isChecked()) {
+            m_actDrawLine->setChecked(false);
+            m_drawLineMode = false;
+        }
+
+        if (m_actAddText && m_actAddText->isChecked()) {
+            m_actAddText->setChecked(false);
+            m_textMode = false;
+            m_textSizeBox->setVisible(false);
+            m_colorBlack->setVisible(false);
+            m_colorRed->setVisible(false);
+            m_colorBlue->setVisible(false);
+        }
+
+        if (m_actErase && m_actErase->isChecked()) {
+            m_actErase->setChecked(false);
+            m_eraseMode = false;
+        }
+
+        view->setCursor(Qt::OpenHandCursor);
+
+        statusBar()->showMessage("Modo transportador activado");
+    }
+    else
+    {
+        view->unsetCursor();
+        statusBar()->clearMessage();
+        // ocultarlo al desmarcar la opción.
+         m_protractor->setVisible(false);
+    }
+}
+
+
+
+
 bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 {
     if (obj == view->viewport()) {
 
         // Si no hay ningún modo activo, devolvemos false para que la vista gestione normalmente.
-        if (!m_drawLineMode && !m_textMode && !m_eraseMode)
+        if (!m_drawLineMode && !m_textMode && !m_eraseMode && !m_protractorMode)
             return false;
+
         // =========================
         // MODO LINEA
         // =========================
@@ -397,6 +495,71 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
             // Para movimientos u otros eventos en modo texto no hacemos nada especial
             return false;
         }
+
+        // =====================================================
+        // === MODO TRANSPORTADOR: medir ángulos
+        // =====================================================
+        if (m_protractorMode)
+        {
+            if (event->type() == QEvent::MouseButtonPress)
+            {
+                auto *e = static_cast<QMouseEvent*>(event);
+
+                if (e->button() == Qt::LeftButton)
+                {
+                    // Posición del clic en coordenadas de la escena
+                    QPointF scenePos = view->mapToScene(e->pos());
+
+                    // 1. Comprobar si clicas sobre el transportador
+                    QPointF local = m_protractor->mapFromScene(scenePos);
+                    bool inside = m_protractor->boundingRect().contains(local);
+
+                    if (inside) {
+                        // Dejar que el transportador se mueva libremente
+                        return false;
+                    }
+
+                    // 2. Medir ángulo respecto al centro real del transportador
+                    QPointF centerLocal = m_protractor->boundingRect().center();
+                    QPointF centerScene = m_protractor->sceneTransform().map(centerLocal);
+                        // centro mapeado a escena
+
+                    // Vector desde el centro al clic
+                    QPointF d = scenePos - centerScene;
+
+                    // Calcular ángulo
+                    double angleRad = std::atan2(-d.y(), d.x());  // Y invertida porque Qt tiene origen arriba
+                    double angleDeg = angleRad * 180.0 / M_PI;
+                    if (angleDeg < 0) angleDeg += 360.0;
+
+                    // Dibujar línea desde el centro
+                    QPen pen(Qt::black, 4);
+                    QGraphicsLineItem *line = new QGraphicsLineItem(QLineF(centerScene, scenePos));
+                    line->setPen(pen);
+                    line->setZValue(500);
+                    scene->addItem(line);
+
+                    // Texto con el ángulo
+                    QGraphicsTextItem *t = scene->addText(QString::number(angleDeg, 'f', 1) + "°");
+                    QFont f;
+                    f.setPointSize(28);
+                    f.setBold(true);
+                    t->setFont(f);
+                    t->setDefaultTextColor(Qt::black);
+                    t->setZValue(500);
+                    t->setPos(scenePos + QPointF(15, -20));
+
+                    return true;
+                }
+            }
+
+            // Dejar mover la carta o usar rueda libremente
+            return false;
+        }
+
+
+
+
     }
 
     return QMainWindow::eventFilter(obj, event);
