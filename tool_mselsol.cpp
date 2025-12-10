@@ -9,9 +9,10 @@ Tool::Tool(const QString& svgResourcePath, QGraphicsItem* parent)
     : QGraphicsSvgItem(svgResourcePath, parent)
 {
     // Flags para poder moverla, seleccionarla y que ignore las transformaciones del view
-        setFlags(QGraphicsItem::ItemIsMovable
-                 | QGraphicsItem::ItemIsSelectable
-                 | QGraphicsItem::ItemSendsGeometryChanges);
+    setFlags(QGraphicsItem::ItemIsMovable
+             | QGraphicsItem::ItemIsSelectable
+             | QGraphicsItem::ItemSendsGeometryChanges);
+
 
 
     // Origen de rotación = centro del SVG
