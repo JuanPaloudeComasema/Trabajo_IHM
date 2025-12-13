@@ -42,6 +42,7 @@ private slots:
 
     void setProtractorMode(bool enabled);
 
+    void setMarkPointMode(bool enabled);
 
 
 private:
@@ -83,6 +84,10 @@ private:
     // Botón Transportador
     QAction *m_actProtractor = nullptr;
     bool m_protractorMode = false;
+
+    // Modo marcar extremos
+    bool m_markPointMode = false;
+    QAction *m_actMarkPoint = nullptr;
 
 
 };
