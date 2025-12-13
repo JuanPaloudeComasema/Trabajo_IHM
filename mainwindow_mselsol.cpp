@@ -136,6 +136,16 @@ MainWindow::MainWindow(QWidget *parent)
     m_protractor->setPos(view->mapToScene(20, 20));
     m_protractor->setVisible(false);  // no visible al inicio
 
+
+    // =====================================================
+    // === Acción MARCAR EXTREMOS (punto 10)
+    // =====================================================
+    m_actMarkPoint = ui->toolBar->addAction("Extremos");
+    m_actMarkPoint->setCheckable(true);
+    connect(m_actMarkPoint, &QAction::toggled,
+            this, &MainWindow::setMarkPointMode);
+
+
 }
 
 void MainWindow::zoomIn()
@@ -359,6 +369,34 @@ void MainWindow::setProtractorMode(bool enabled)
     }
 }
 
+void MainWindow::setMarkPointMode(bool enabled)
+{
+    m_markPointMode = enabled;
+
+    if (enabled) {
+        view->setCursor(Qt::CrossCursor);
+
+        // Apagar otros modos
+        if (m_actDrawLine && m_actDrawLine->isChecked())
+            m_actDrawLine->setChecked(false);
+
+        if (m_actAddText && m_actAddText->isChecked())
+            m_actAddText->setChecked(false);
+
+        if (m_actErase && m_actErase->isChecked())
+            m_actErase->setChecked(false);
+
+        if (m_actProtractor && m_actProtractor->isChecked())
+            m_actProtractor->setChecked(false);
+
+        statusBar()->showMessage("Modo marcar extremos activado");
+    }
+    else {
+        view->unsetCursor();
+        statusBar()->clearMessage();
+    }
+}
+
 
 
 
@@ -367,7 +405,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
     if (obj == view->viewport()) {
 
         // Si no hay ningún modo activo, devolvemos false para que la vista gestione normalmente.
-        if (!m_drawLineMode && !m_textMode && !m_eraseMode && !m_protractorMode)
+        if (!m_drawLineMode && !m_textMode && !m_eraseMode && !m_protractorMode && !m_markPointMode)
             return false;
 
         // =========================
@@ -548,13 +586,60 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
                     t->setZValue(500);
                     t->setPos(scenePos + QPointF(15, -20));
 
+
                     return true;
                 }
             }
-
-            // Dejar mover la carta o usar rueda libremente
             return false;
         }
+
+        // =========================
+        // 10. MARCAR EXTREMOS DE UN PUNTO EN LA CARTA
+        // =========================
+        if (m_markPointMode)
+        {
+            if (event->type() == QEvent::MouseButtonPress)
+            {
+                auto *e = static_cast<QMouseEvent*>(event);
+
+                if (e->button() == Qt::LeftButton)
+                {
+                    QPointF p = view->mapToScene(e->pos());
+
+                    // Obtenemos los límites de la carta (primer item, z=0)
+                    QRectF chartRect;
+                    for (QGraphicsItem *it : scene->items()) {
+                        if (it->zValue() == 0) {
+                            chartRect = it->boundingRect().translated(it->pos());
+                            break;
+                        }
+                    }
+
+                    // Punto central
+                    scene->addEllipse(p.x()-4, p.y()-4, 8, 8,
+                                      QPen(Qt::black), QBrush(Qt::black))->setZValue(100);
+
+                    // Línea horizontal hasta el borde izquierdo
+                    scene->addLine(chartRect.left(), p.y(), p.x(), p.y(),
+                                   QPen(Qt::black, 2))->setZValue(100);
+
+                    // Línea vertical hasta el borde superior
+                    scene->addLine(p.x(), chartRect.top(), p.x(), p.y(),
+                                   QPen(Qt::black, 2))->setZValue(100);
+
+                    // Salir del modo
+                    if (m_actMarkPoint)
+                        m_actMarkPoint->setChecked(false);
+                    m_markPointMode = false;
+                    view->unsetCursor();
+
+                    return true;
+                }
+            }
+            return false;
+        }
+
+
 
 
 
